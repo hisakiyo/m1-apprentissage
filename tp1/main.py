@@ -18,6 +18,17 @@ pipeline = make_pipeline(PolynomialFeatures(degree=1), Ridge())
 pipeline.fit(val[0].reshape(-1, 1), val[1])
 y_pred = pipeline.predict(val[0].reshape(-1, 1))
 plt.plot(val[0], y_pred, 'r-', label='degree 1')
+
+pipeline = make_pipeline(PolynomialFeatures(degree=3), Ridge())
+pipeline.fit(val[0].reshape(-1, 1), val[1])
+y_pred = pipeline.predict(val[0].reshape(-1, 1))
+plt.plot(val[0], y_pred, 'b-', label='degree 3')
+
+pipeline = make_pipeline(PolynomialFeatures(degree=6), Ridge())
+pipeline.fit(val[0].reshape(-1, 1), val[1])
+y_pred = pipeline.predict(val[0].reshape(-1, 1))
+plt.plot(val[0], y_pred, 'y', label='degree 6')
+
 plt.legend(loc='upper left')
 plt.savefig('pizzas_pred.png')
 
