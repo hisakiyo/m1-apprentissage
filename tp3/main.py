@@ -24,8 +24,10 @@ class Neurone:
             self.sortie = 1
         else:
             self.sortie = -1
-    
-
+    def mise_a_jour_neurone(self, etiquette, exemple):
+        self.biais = self.biais + self.pas * (etiquette - self.sortie) * -0.5
+        for i in range(len(exemple)):
+            self.poids[i] = self.poids[i] + self.pas * (etiquette - self.sortie) * exemple[i]
 
 def generate_data(n):
     data = []
@@ -43,8 +45,16 @@ def write_data(data, fileName):
         file.write(str(d[0]) + " " + str(d[1]) + " " + str(d[2]) + "\n")
     file.close()
 
-write_data(generate_data(50), "data.txt")
-# Test neurone
+data = generate_data(10)
 neurone = Neurone(2)
 neurone.init_neurone()
-print(neurone.biais)
+for i in range(100):
+    nb_erreur = 0
+    for exemple in data:
+        neurone.calcul_valeur_neurone(exemple[0:2])
+        if exemple[2] != neurone.sortie:
+            nb_erreur += 1
+            neurone.mise_a_jour_neurone(exemple[2], exemple[0:2])
+    print("Nombre d'erreur : " + str(nb_erreur))
+
+        
