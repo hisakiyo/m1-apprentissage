@@ -1,33 +1,38 @@
 import random
 
+import numpy as np
+
 class Agent:
-    def __init__(self, vlambda, ile):
+    def __init__(self, vlambda, ile, q=[]):
         self.vlambda = vlambda
-        self.q = []
+        self.q = q
         self.ile = ile
         self.init_matrix()
     
     def init_matrix(self):
-        self.q = self.ile.calculer_matrice_etat_actions()
-        # For into self.q and set all values to 0 
-        for i in range(self.ile.taille):
-            for j in range(self.ile.taille):
-                for k in range(4):
-                    if self.q[i][j][k] != -1:
-                        self.q[i][j][k] = 0
-
+        if len(self.q) == 0:
+            self.q = self.ile.calculer_matrice_etat_actions()
+            # For into self.q and set all values to 0 
+            for i in range(self.ile.taille):
+                for j in range(self.ile.taille):
+                    for k in range(4):
+                        if self.q[i][j][k] != -1:
+                            self.q[i][j][k] = 0
+                            
     def update_q(self, etat, action, reward):
-        self.q[etat[0]][etat[1]][action] += self.vlambda * (reward - self.q[etat[0]][etat[1]][action])
-        print('ajouté :', self.vlambda * (reward - self.q[etat[0]][etat[1]][action]))
-        return self.ile.etat_suivant(etat, action)
+        if self.q[etat[0]][etat[1]][action] != -1:
+            self.q[etat[0]][etat[1]][action] += self.vlambda * (reward + (1-self.vlambda) * np.max(self.q[etat[0]][etat[1]]) - self.q[etat[0]][etat[1]][action])
+        return self.choisir_action(etat)
 
     # In Qtable, find the best action for the current state
     def choisir_action(self, etat):
         # Get possible actions
         action = self.q[etat[0]][etat[1]].index(max(self.q[etat[0]][etat[1]]))
         if self.q[etat[0]][etat[1]][action] == 0:
-            action = random.randint(0, 3)
-        print('State :', self.q[etat[0]][etat[1]])
+            possibles_actions = self.ile.actions_possibles()
+            # pick a random action between possible actions
+            action = random.choice(possibles_actions)
+
         if action == 0:
             return 'N'
         elif action == 1:
@@ -36,18 +41,28 @@ class Agent:
             return 'E'
         elif action == 3:
             return 'O'
+        else:
+            return action
 
 
 
 class Ile:
-    def __init__(self, taille=10, nb_rhum=3, position_joueur=[0, 0]):
+    def __init__(self, taille=10, nb_rhum=20, position_joueur=[0, 0]):
         self.matrice = []
         self.taille = taille
         self.nb_rhum = nb_rhum
         self.nb_tresor = 1
         self.position_joueur = position_joueur
         self.steps = 0
-        self.max_steps = 20000
+        self.max_steps = 20
+
+    def definir_matrice(self, matrice):
+        self.matrice = matrice
+
+    def reset(self, matrice):
+        self.steps = 0
+        self.position_joueur = [0, 0]
+        self.definir_matrice(matrice)
     
     def init_matrice(self):
         for i in range(self.taille):
@@ -155,11 +170,8 @@ class Ile:
         # Get next coordinates with etat_suivant
         next_etat = self.etat_suivant(self.position_joueur, direction)
         # Check if next coordinates are in the map
-        print('next_etat :', next_etat)
-        print('matrice :', self.matrice)
         if self.matrice[next_etat[0]][next_etat[1]] == 10:
-            print('Tresor trouvé !')
-            exit()
+            return 1
         if self.steps < self.max_steps:
             if direction == 'N':
                 if self.position_joueur[0] > 0:
@@ -208,42 +220,61 @@ def run_egreedy(ile):
         print("Nombre de pas: ", ile.steps)
         print("\n")
 
-def qlearning(ile):
-    agent = Agent(0.9, ile)
-    choosen_path = []
-    for step in range(ile.max_steps):
-        print(ile)
-        print("Actions possibles: ", ile.actions_possibles())
-        action = agent.choisir_action(ile.position_joueur)
-        print("Action choisie: ", action)
-        choosen_path.append(action)
-        ile.mouvement_joueur(action)
-        print("Position du joueur: ", ile.position_joueur)
-        print("Nombre de pas: ", ile.steps)
-        reward = ile.matrice[ile.position_joueur[0]][ile.position_joueur[1]]
-        etat = ile.position_joueur
-        # determine action idx
-        action_idx = 0
-        if action == 'N':
+def qlearning():
+    nb_episodes = 2
+    nb_success = 0
+    nb_fail = 0
+    q = []
+    ile = Ile(5)
+    ile.generer_ile()
+    map_save = list(ile.matrice)
+    for episode in range(nb_episodes):
+        agent = Agent(0.9, ile, q)
+        choosen_path = []
+        cpt = 0
+        total_reward = 0
+        for step in range(ile.max_steps):
+            cpt += 1
+            action = agent.choisir_action(ile.position_joueur)
+            choosen_path.append(action)
+            reward = ile.matrice[ile.position_joueur[0]][ile.position_joueur[1]]
+            total_reward += reward
+            state_game = ile.mouvement_joueur(action)
+            if state_game == 1:
+                q = agent.q
+                print("\nTrésor trouvé !")
+                print('Total reward : ', total_reward+10)
+                nb_success += 1
+                ile.reset(list(map_save))
+                break
+            etat = ile.position_joueur
+            # determine action idx
             action_idx = 0
-        elif action == 'S':
-            action_idx = 1
-        elif action == 'E':
-            action_idx = 2
-        elif action == 'O':
-            action_idx = 3
-        print("Reward: ", reward)
-        print("Path: ", choosen_path)
-        print(agent.q)
-        agent.update_q(etat, action_idx, reward)
-        print("\n")
-
-    # Fill qtable
+            if action == 'N':
+                action_idx = 0
+            elif action == 'S':
+                action_idx = 1
+            elif action == 'E':
+                action_idx = 2
+            elif action == 'O':
+                action_idx = 3
+            agent.update_q(etat, action_idx, reward)
+        if cpt == ile.max_steps:
+            print("Le pirate était trop bourré pour trouver le trésor")
+            ile.reset(list(map_save))
+            q = agent.q
+            print('Total reward: ', total_reward)
+            nb_fail += 1
+        # Fill qtable
+    print("Nombre d'épisodes: ", nb_episodes)
+    print("Nombre d'épisodes gagnés: ", nb_success)
+    print("Nombre d'épisodes perdus: ", nb_fail)
+    print('Q-table finale: ', q)
+    print('Ile finale: ', map_save)
 
 def main():
-    ile = Ile(10)
-    ile.generer_ile()
-    qlearning(ile)
+    # run_egreedy(ile)
+    qlearning()
     
 
 if __name__ == '__main__':
